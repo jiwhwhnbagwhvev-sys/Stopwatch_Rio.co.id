@@ -1,0 +1,456 @@
+<!doctype html>
+
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stopwatch — Lengkap</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --glass:rgba(255,255,255,0.04);
+    }
+    [data-theme="light"]{ --bg:#f6f8fb; --card:#ffffff; --muted:#6b7280; --accent:#0ea5a4; --glass:rgba(0,0,0,0.04); }*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+body{background:linear-gradient(180deg,var(--bg),#020617);color:#e6eef8;padding:24px}
+.wrap{max-width:980px;margin:0 auto}
+
+.card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 6px 24px rgba(2,6,23,0.6);}
+header{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+h1{font-size:18px;margin:0}
+p.lead{margin:0;color:var(--muted);font-size:13px}
+
+.top{display:flex;gap:14px;align-items:center}
+.display{flex:1;display:flex;align-items:center;gap:18px}
+.timebox{background:var(--glass);padding:18px;border-radius:12px;min-width:260px;text-align:center}
+.time{font-size:38px;font-weight:700;letter-spacing:0.6px}
+.sub{font-size:12px;color:var(--muted);margin-top:6px}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px 14px;border-radius:10px;color:inherit;cursor:pointer}
+button.primary{background:linear-gradient(90deg,var(--accent),#7dd3fc);color:#022; border:none}
+button.warn{background:#ffedd5;color:#331a00;border:none}
+button.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.04)}
+
+.cols{display:grid;grid-template-columns:1fr 340px;gap:14px;margin-top:14px}
+.laps{max-height:360px;overflow:auto;padding:8px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
+.lap{display:flex;justify-content:space-between;padding:8px;border-bottom:1px dashed rgba(255,255,255,0.02)}
+.stat{display:flex;gap:8px;flex-direction:column;margin-top:8px}
+
+.settings{display:flex;flex-direction:column;gap:8px}
+label{font-size:13px;color:var(--muted)}
+input[type="number"],select,input[type="text"]{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+
+.footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:13px}
+
+/* progress ring */
+.ring{width:120px;height:120px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column}
+
+/* responsive */
+@media (max-width:900px){.cols{grid-template-columns:1fr;}.display{flex-direction:column}.ring{margin:0 auto}}
+
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div>
+          <h1>Stopwatch — Rio.co.id</h1>
+          <p class="lead">Start / Pause / Lap / Reset • Export Laps • Tema • Shortcut keyboard</p>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button id="themeToggle" class="ghost" title="Toggle theme">Toggle Tema</button>
+          <button id="fullscreenBtn" class="ghost" title="Fullscreen">Fullscreen</button>
+        </div>
+      </header><div class="top">
+    <div class="display">
+      <div class="timebox">
+        <div class="time" id="displayTime">00:00:00.00</div>
+        <div class="sub" id="modeLabel">Mode: Stopwatch</div>
+      </div>
+
+      <div class="controls">
+        <button id="startStop" class="primary">Start</button>
+        <button id="lapBtn">Lap</button>
+        <button id="resetBtn" class="warn">Reset</button>
+        <button id="exportBtn" class="ghost">Export Laps</button>
+        <button id="clearStorage" class="ghost">Clear Saved</button>
+      </div>
+    </div>
+
+    <div class="ring card" style="padding:18px;display:flex;align-items:center;justify-content:center">
+      <div class="ring" aria-hidden="true">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" stroke="rgba(255,255,255,0.06)" stroke-width="12" fill="none"></circle>
+          <circle id="progressCircle" cx="60" cy="60" r="52" stroke="var(--accent)" stroke-width="12" stroke-linecap="round" fill="none" stroke-dasharray="327.2" stroke-dashoffset="327.2"></circle>
+        </svg>
+        <div class="center">
+          <div style="font-size:12px;color:var(--muted)">Progress</div>
+          <div id="progressPct" style="font-weight:700">0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <section>
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Pengaturan</strong>
+          <small style="color:var(--muted)">Shortcut: Space start/stop • L lap • R reset</small>
+        </div>
+
+        <div class="settings" style="margin-top:10px">
+          <label>Precision (ms)</label>
+          <select id="precision">
+            <option value="10">Centisecond (10 ms)</option>
+            <option value="1">Millisecond (1 ms)</option>
+            <option value="100">Decisecond (100 ms)</option>
+          </select>
+
+          <label>Enable Countdown Mode? (enter seconds)</label>
+          <input type="number" id="countdownInput" placeholder="Kosongkan untuk stopwatch" min="1" />
+
+          <label>Alarm on finish (countdown)</label>
+          <input type="checkbox" id="alarmOnFinish" checked />
+
+          <label>Session name (optional)</label>
+          <input type="text" id="sessionName" placeholder="Nama sesi untuk simpan" />
+
+          <div style="display:flex;gap:8px">
+            <button id="saveSession" class="ghost">Simpan Sesi</button>
+            <button id="loadSession" class="ghost">Muat Sesi Terakhir</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <strong>Lap History</strong>
+        <div class="laps" id="laps"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="clearLaps" class="ghost">Clear Laps</button>
+          <button id="calcStats" class="ghost">Show Stats</button>
+        </div>
+        <div class="stat" id="stats" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <strong>Saved Sessions</strong>
+        <div id="savedList" style="margin-top:8px;max-height:220px;overflow:auto"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="exportAll" class="ghost">Export All Sessions</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <strong>Controls & Info</strong>
+        <ul style="margin:8px 0;padding-left:18px;color:var(--muted)">
+          <li>Space — Start / Pause</li>
+          <li>L — Record Lap</li>
+          <li>R — Reset</li>
+          <li>Click 'Lap' while paused to edit last lap</li>
+        </ul>
+        <div style="margin-top:8px;color:var(--muted)">Notes: Laps persist between reloads if you save the session.</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="footer">
+    <div id="lastSaved" aria-live="polite">Belum ada sesi tersimpan</div>
+    <div>Made with ❤️ • {local}</div>
+  </div>
+</div>
+
+  </div>  <script>
+    // Utility helpers
+    const $ = (s) => document.querySelector(s);
+    const fmt = (ms, precision) => {
+      // precision = 1,10,100 in ms granularity
+      const total = Math.max(0, Math.floor(ms / precision) * precision);
+      const cs = Math.floor((total % 1000) / (precision)); // unit depends on precision
+      const s = Math.floor(total / 1000) % 60;
+      const m = Math.floor(total / (60*1000)) % 60;
+      const h = Math.floor(total / (3600*1000));
+      const pad = (n, len=2) => String(n).padStart(len,'0');
+      if (precision >= 100) {
+        // show deciseconds or coarse
+        return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(Math.floor((total%1000)/100),1)}`;
+      }
+      if (precision === 10) return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(cs,2)}`;
+      return `${pad(h)}:${pad(m)}:${pad(s)}.${String(total%1000).padStart(3,'0')}`;
+    }
+
+    // app state
+    let running = false;
+    let startTs = 0; // timestamp when started
+    let offset = 0; // accumulated ms
+    let rafId = null;
+    let precision = 10; // default 10 ms
+    let laps = [];
+    let countdownTarget = null; // ms
+    let progressMax = 60*1000; // default progress mapping
+
+    // DOM refs
+    const displayTime = $('#displayTime');
+    const startStop = $('#startStop');
+    const lapBtn = $('#lapBtn');
+    const resetBtn = $('#resetBtn');
+    const exportBtn = $('#exportBtn');
+    const clearLapsBtn = $('#clearLaps');
+    const lapsEl = $('#laps');
+    const precisionSel = $('#precision');
+    const countdownInput = $('#countdownInput');
+    const modeLabel = $('#modeLabel');
+    const progressCircle = $('#progressCircle');
+    const progressPct = $('#progressPct');
+    const alarmOnFinish = $('#alarmOnFinish');
+    const themeToggle = $('#themeToggle');
+    const fullscreenBtn = $('#fullscreenBtn');
+    const saveSessionBtn = $('#saveSession');
+    const loadSessionBtn = $('#loadSession');
+    const clearStorageBtn = $('#clearStorage');
+    const savedList = $('#savedList');
+    const sessionNameInput = $('#sessionName');
+    const exportAllBtn = $('#exportAll');
+    const lastSaved = $('#lastSaved');
+    const statsBox = $('#stats');
+    const calcStatsBtn = $('#calcStats');
+
+    // Progress circle metrics
+    const CIRCUM = 2 * Math.PI * 52; // r=52
+    progressCircle.style.strokeDasharray = CIRCUM;
+    progressCircle.style.strokeDashoffset = CIRCUM;
+
+    // sound generator (Web Audio)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq=880, dur=0.08){
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type='sine'; o.frequency.value=freq; g.gain.value=0.0001;
+      o.connect(g); g.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+      g.gain.exponentialRampToValueAtTime(0.18, now+0.01);
+      o.start(now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      o.stop(now + dur + 0.02);
+    }
+
+    function updateDisplay(ms){
+      displayTime.textContent = fmt(ms, precision);
+    }
+
+    function updateProgress(ms){
+      // if countdown, show percent of elapsed toward target
+      let pct=0;
+      if (countdownTarget){
+        pct = Math.min(100, Math.round((1 - ms / countdownTarget) * 100));
+      } else {
+        const loop = progressMax; // wrap-around indicator for long runs
+        pct = Math.min(100, Math.round((ms % loop) / loop * 100));
+      }
+      progressPct.textContent = pct + '%';
+      const offset = CIRCUM * (1 - pct/100);
+      progressCircle.style.strokeDashoffset = offset;
+    }
+
+    function tick(){
+      const now = performance.now();
+      const elapsed = offset + (running ? now - startTs : 0);
+      if (countdownTarget){
+        const remaining = Math.max(0, countdownTarget - elapsed);
+        updateDisplay(remaining);
+        updateProgress(remaining);
+        if (remaining === 0){
+          stop(true);
+          if (alarmOnFinish.checked) beep(880,0.5);
+        }
+      } else {
+        updateDisplay(elapsed);
+        updateProgress(elapsed);
+      }
+      if (running) rafId = requestAnimationFrame(tick);
+    }
+
+    function start(){
+      if (!running){
+        running = true;
+        startTs = performance.now();
+        startStop.textContent = 'Pause';
+        rafId = requestAnimationFrame(tick);
+      }
+    }
+    function stop(finish=false){
+      if (running){
+        running = false;
+        const now = performance.now();
+        offset += now - startTs;
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      startStop.textContent = 'Start';
+      if (finish){
+        // keep display at 0 for countdown
+        updateDisplay(0);
+      }
+    }
+
+    function reset(){
+      running = false; offset = 0; startTs = 0; laps = [];
+      updateDisplay(countdownTarget?countdownTarget:0);
+      updateLapsUI();
+      startStop.textContent = 'Start';
+      progressCircle.style.strokeDashoffset = CIRCUM; progressPct.textContent='0%';
+    }
+
+    function recordLap(){
+      const now = offset + (running ? performance.now() - startTs : 0);
+      // lap value is elapsed so far
+      const lapTime = now;
+      const prev = laps.length?laps[laps.length-1].elapsedAt:0;
+      const split = lapTime - prev;
+      const item = {id:Date.now(), elapsedAt:lapTime, split:split};
+      laps.push(item);
+      updateLapsUI();
+    }
+
+    function updateLapsUI(){
+      lapsEl.innerHTML = ''; statsBox.innerHTML='';
+      laps.slice().reverse().forEach((l, idx)=>{
+        const i = document.createElement('div'); i.className='lap';
+        const no = document.createElement('div'); no.innerHTML = `<div style="font-weight:700">Lap ${laps.length - idx}</div><div style="color:var(--muted);font-size:12px">${fmt(l.split, precision)}</div>`;
+        const at = document.createElement('div'); at.style.textAlign='right'; at.innerHTML = `<div style="font-weight:700">${fmt(l.elapsedAt,precision)}</div><div style="color:var(--muted);font-size:12px">${new Date(l.id).toLocaleTimeString()}</div>`;
+        i.appendChild(no); i.appendChild(at);
+        lapsEl.appendChild(i);
+      });
+    }
+
+    function exportCSV(){
+      if (!laps.length) return alert('Tidak ada lap untuk diexport');
+      const rows = [['Lap','Split(ms)','Split Formatted','Elapsed(ms)','Elapsed Formatted']];
+      laps.forEach((l, i)=>rows.push([i+1, l.split, fmt(l.split,precision), l.elapsedAt, fmt(l.elapsedAt,precision)]));
+      const csv = rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download = (sessionNameInput.value || 'stopwatch') + '-laps.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // Save/load to localStorage
+    function saveSession(){
+      const sessions = JSON.parse(localStorage.getItem('sw.sessions')||'[]');
+      const payload = {id:Date.now(), name: sessionNameInput.value || `Sesi ${new Date().toLocaleString()}`, precision, countdownSec: countdownInput.value||null, laps, offset, running, ts:Date.now()};
+      sessions.unshift(payload);
+      localStorage.setItem('sw.sessions', JSON.stringify(sessions.slice(0,50)));
+      lastSaved.textContent = `Tersimpan: ${payload.name} • ${new Date(payload.ts).toLocaleString()}`;
+      renderSavedList();
+    }
+    function loadLastSession(){
+      const sessions = JSON.parse(localStorage.getItem('sw.sessions')||'[]');
+      if (!sessions.length) return alert('Tidak ada sesi tersimpan');
+      const s = sessions[0];
+      precision = s.precision; precisionSel.value = precision;
+      countdownInput.value = s.countdownSec || '';
+      laps = s.laps || [];
+      offset = s.offset || 0;
+      running = false; startStop.textContent='Start'; updateLapsUI(); updateDisplay(offset);
+      renderSavedList();
+    }
+    function renderSavedList(){
+      const sessions = JSON.parse(localStorage.getItem('sw.sessions')||'[]');
+      savedList.innerHTML = '';
+      sessions.forEach(s=>{
+        const el = document.createElement('div'); el.style.padding='6px 0'; el.style.borderBottom='1px dashed rgba(255,255,255,0.02)';
+        el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><div style=\"font-weight:700\">${s.name}</div><div style=\"color:var(--muted);font-size:12px\">${new Date(s.ts).toLocaleString()}</div></div><div style=\"display:flex;gap:6px\"><button data-id=\"${s.id}\" class=\"ghost\">Load</button><button data-id=\"${s.id}\" class=\"ghost\">Export</button></div></div>`;
+        savedList.appendChild(el);
+        // bind buttons
+        el.querySelectorAll('button')[0].addEventListener('click',()=>{ loadSessionById(s.id); });
+        el.querySelectorAll('button')[1].addEventListener('click',()=>{ exportSessionJSON(s.id); });
+      });
+    }
+    function loadSessionById(id){
+      const sessions = JSON.parse(localStorage.getItem('sw.sessions')||'[]');
+      const s = sessions.find(x=>x.id==id); if(!s) return alert('Sesi tidak ditemukan');
+      precision = s.precision; precisionSel.value = precision;
+      countdownInput.value = s.countdownSec || '';
+      laps = s.laps || [];
+      offset = s.offset || 0; running = false; startStop.textContent='Start'; updateLapsUI(); updateDisplay(offset);
+    }
+    function exportSessionJSON(id){
+      const sessions = JSON.parse(localStorage.getItem('sw.sessions')||'[]');
+      const s = sessions.find(x=>x.id==id); if(!s) return alert('Not found');
+      const blob = new Blob([JSON.stringify(s, null, 2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download = (s.name||'session') + '.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    function exportAllSessions(){
+      const sessions = JSON.parse(localStorage.getItem('sw.sessions')||'[]'); if(!sessions.length) return alert('No sessions');
+      const blob = new Blob([JSON.stringify(sessions, null, 2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download = 'all-stopwatch-sessions.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    function clearSaved(){ if(confirm('Hapus semua sesi tersimpan?')){ localStorage.removeItem('sw.sessions'); renderSavedList(); lastSaved.textContent='Belum ada sesi tersimpan'; }}
+
+    // simple stats
+    function calcStats(){ if(!laps.length) return alert('Tidak ada lap');
+      const splits = laps.map(l=>l.split);
+      const sum = splits.reduce((a,b)=>a+b,0);
+      const avg = sum / splits.length;
+      const fastest = Math.min(...splits);
+      const slowest = Math.max(...splits);
+      statsBox.innerHTML = `<div style="font-size:13px;color:var(--muted)">Jumlah lap: ${splits.length}</div><div>Rata-rata: ${fmt(avg,precision)}</div><div>Tercepat: ${fmt(fastest,precision)}</div><div>Terlambat: ${fmt(slowest,precision)}</div>`;
+    }
+
+    // events
+    startStop.addEventListener('click',()=>{ if(running) stop(); else start(); });
+    lapBtn.addEventListener('click',()=>{ if(!running && laps.length){ // edit last lap time
+      const last = laps[laps.length-1]; const newLabel = prompt('Edit waktu lap (format ms) :', String(Math.round(last.split))); if(newLabel!==null){ const v = Number(newLabel); if(!Number.isNaN(v)){ last.split = v; last.elapsedAt = (laps.length>1?laps[laps.length-2].elapsedAt:0) + v; updateLapsUI(); } }
+    } else recordLap(); });
+    resetBtn.addEventListener('click',()=>{ if(confirm('Reset stopwatch? Semua lap akan hilang.')) reset(); });
+    clearLapsBtn.addEventListener('click',()=>{ if(confirm('Hapus semua lap?')){ laps=[]; updateLapsUI(); }});
+    exportBtn.addEventListener('click', exportCSV);
+    precisionSel.addEventListener('change', (e)=>{ precision = Number(e.target.value); updateDisplay(offset + (running?performance.now()-startTs:0)); });
+    countdownInput.addEventListener('change', ()=>{
+      const v = Number(countdownInput.value);
+      if (!v) { countdownTarget = null; modeLabel.textContent='Mode: Stopwatch'; } else { countdownTarget = v * 1000; modeLabel.textContent='Mode: Countdown ('+v+'s)'; }
+      updateDisplay(countdownTarget || 0);
+    });
+
+    saveSessionBtn.addEventListener('click', saveSession);
+    loadSessionBtn.addEventListener('click', loadLastSession);
+    clearStorageBtn.addEventListener('click', clearSaved);
+    exportAllBtn.addEventListener('click', exportAllSessions);
+    calcStatsBtn.addEventListener('click', calcStats);
+
+    // theme toggle
+    themeToggle.addEventListener('click', ()=>{
+      const el = document.body; const t = el.getAttribute('data-theme'); el.setAttribute('data-theme', t==='dark'?'light':'dark');
+    });
+
+    // fullscreen
+    fullscreenBtn.addEventListener('click', ()=>{
+      if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen();
+    });
+
+    // keyboard shortcuts
+    document.addEventListener('keydown', (e)=>{
+      if (e.code === 'Space'){ e.preventDefault(); if(running) stop(); else start(); }
+      if (e.key.toLowerCase()==='l'){ recordLap(); }
+      if (e.key.toLowerCase()==='r'){ if(confirm('Reset stopwatch?')) reset(); }
+    });
+
+    // init
+    (function init(){
+      precision = Number(precisionSel.value);
+      updateDisplay(0);
+      renderSavedList();
+      // restore last if exists
+      const last = JSON.parse(localStorage.getItem('sw.lastState')||'null');
+      if (last){ /* optional restore logic */ }
+      // set a reasonable progress mapping based on countdown or default
+      progressMax = 60*1000; // 1 minute loop for visual effect
+    })();
+  </script></body>
+</html>
